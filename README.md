@@ -1,63 +1,52 @@
-# passrw_alerts
+A Telegram bot with a Mini App that tracks sold-out trains on [pass.rw.by](https://pass.rw.by) and sends a message when seats become available.
 
 > [!WARNING]
-> **This is an educational pet project, built purely to learn Telegram bots, Mini Apps, MongoDB and Docker. It is not a public service and is not intended for production use.**
+> **This is an educational pet project, built purely to learn Telegram bots, Mini Apps, MongoDB and Docker. It is not a public service.**
 >
-> pass.rw.by (Belarusian Railways) prohibits automated access to its booking service. Clause 81 of the
-> [Rules for issuing and using electronic tickets for trains with numbered seats](https://pass.rw.by/ru/help/travel-documents-tickets/electronic-travel-documents/rules-of-registration-and-use-of-electronic-travel-documents-tickets-on-trains-with-numbered-seats-.html)
-> lists, among violations leading to account blocking, *regular search queries for specific routes sent on a time
-> pattern (every hour at a certain time / every N minutes, etc.)* and ticket purchases using robotic requests.
-> The site also runs active anti-bot protection. Do not use this code to poll the site — doing so violates its rules.
-> The author takes no responsibility for any use of this code.
+> pass.rw.by prohibits automated access: clause 81 of its
+> [e-ticket rules](https://pass.rw.by/ru/help/travel-documents-tickets/electronic-travel-documents/rules-of-registration-and-use-of-electronic-travel-documents-tickets-on-trains-with-numbered-seats-.html)
+> treats *regular search queries for specific routes sent on a time pattern* as a violation, and the site runs active
+> anti-bot protection. Do not use this code to poll the site. The author takes no responsibility for any use of this code.
 
-Telegram bot + Mini App that watches sold-out trains on [pass.rw.by](https://pass.rw.by) and alerts you when seats appear.
+## The problem
+
+Popular Belarusian trains often sell out days in advance. Seats still come back when tickets are returned, extra cars are added or unfinished bookings expire, but they are bought again within minutes. Today the only way to catch one is to keep reloading the site by hand.
+
+## The idea
+
+1. In the Mini App, pick the stations and a date, choose a train and the seat categories you need (seated, platzkart, coupe, SV, bike, accessible).
+2. When new seats appear, the bot sends one message containing:
+   - the train and the seats that appeared;
+   - the total number of free seats;
+   - a link to the site;
+   - **"Got a ticket"** / **"Keep searching"** buttons.
+3. Alerts continue until you confirm the purchase or the train departs. Subscriptions are listed in **"My trains"**.
+
+The bot never buys tickets; you buy them yourself on the official site.
+
+## Architecture (planned)
+
+A worker fetches each tracked route once for all subscribers and compares free seats with the previous snapshot. An aiogram bot delivers the alerts. A FastAPI backend serves the React Mini App. Data is stored in MongoDB, with Metabase for statistics. Everything runs with `docker compose` on a home server, and the Mini App is exposed through Cloudflare Tunnel.
+
+**Stack:** Python 3.13, uv, httpx, selectolax, pydantic, aiogram 3, FastAPI, MongoDB, React + `@telegram-apps/telegram-ui`, Docker, Metabase.
 
 ## Status
 
-| Stage | State |
-|---|---|
-| 0. Polling test (`scripts/poll_test.py`) | ✅ anti-bot challenge triggered after ~10 min at ~2 req/min |
-| 1. Project skeleton | ✅ |
-| 2. pass.rw.by scraper | ✅ |
-| 3+ (MongoDB, worker, bot, API, Mini App, Docker, Metabase) | planned |
+- ✅ Project skeleton and the pass.rw.by scraper with offline tests.
+- ✅ Rate-limit test: the anti-bot challenge triggered after ~10 minutes at ~2 requests per minute.
+- ⏳ Worker, bot, API, Mini App, Docker setup.
 
 ## Development
 
-Requires [uv](https://docs.astral.sh/uv/).
-
 ```bash
-uv sync                 # create .venv and install deps
-uv run pytest           # tests (offline, use saved fixtures)
+uv sync                 # install deps (requires uv)
+uv run pytest           # offline tests on saved fixtures
 uv run ruff check .     # lint
 uv run ruff format .    # format
+uv run python -m passrw_alerts.scraper Минск Гомель 2026-10-20   # one live request
 ```
 
-Try the scraper against the live site (a single request, not polling):
-
-```bash
-uv run python -m passrw_alerts.scraper Минск Гомель 2026-10-20
-```
-
-## Layout
-
-```
-src/passrw_alerts/
-  scraper/
-    client.py         # async HTTP client for pass.rw.by (httpx)
-    parsers.py        # raw HTML/JSON -> models, no network
-    models.py         # pydantic models: Station, Train, TariffOffer, CarTariff
-    php_serialize.py  # decoder for the PHP-serialized train data embedded in the page
-    __main__.py       # CLI for manual checks
-tests/
-  fixtures/           # saved pass.rw.by responses
-scripts/
-  poll_test.py        # long-running rate-limit / anti-bot test, stdlib only
-```
-
-## How pass.rw.by data is obtained
-
-- `GET /ru/route/?from=…&from_exp=…&to=…&to_exp=…&date=…` — all trains of a route for a date. Every train row with tickets
-  for sale has a hidden `route` input with PHP-serialized data: per-tariff free seat counts, prices, bike / disabled flags.
-  Sold-out trains have no such input, only basic attributes.
-- `GET /ru/ajax/route/car_places/` — concrete free seat numbers per car. Sold-out trains answer with `{"e": …}`.
-- `GET /ru/ajax/autocomplete/search/?term=…` — stations with codes (`exp`).
+The scraper lives in `src/passrw_alerts/scraper/`:
+- `client.py` handles HTTP;
+- `parsers.py` turns raw HTML/JSON into pydantic models without network access;
+- `php_serialize.py` decodes the PHP-serialized train data embedded in the route page.
