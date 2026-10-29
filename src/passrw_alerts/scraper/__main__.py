@@ -20,9 +20,9 @@ async def main(origin_term: str, destination_term: str, travel_date: date) -> No
     for train in trains:
         departure = train.departure.astimezone(MINSK_TZ).strftime("%H:%M")
         if not train.has_numbered_seats:
-            seats = "без мест" if not train.is_available else "в продаже (места без номеров)"
+            seats = "sold out" if not train.is_available else "on sale (unnumbered seats)"
         elif not train.tariffs:
-            seats = "Мест нет"
+            seats = "sold out"
         else:
             seats = ", ".join(f"{t.class_service or t.car_type}: {t.free_seats}" for t in train.tariffs)
         print(f"{departure}  {train.number:<6} {train.train_type:<24} {seats}")

@@ -1,17 +1,25 @@
 # passrw_alerts
 
-Telegram bot + Mini App that watches sold-out trains on [pass.rw.by](https://pass.rw.by) and alerts you when seats appear.
+> [!WARNING]
+> **This is an educational pet project, built purely to learn Telegram bots, Mini Apps, MongoDB and Docker. It is not a public service and is not intended for production use.**
+>
+> pass.rw.by (Belarusian Railways) prohibits automated access to its booking service. Clause 81 of the
+> [Rules for issuing and using electronic tickets for trains with numbered seats](https://pass.rw.by/ru/help/travel-documents-tickets/electronic-travel-documents/rules-of-registration-and-use-of-electronic-travel-documents-tickets-on-trains-with-numbered-seats-.html)
+> lists, among violations leading to account blocking, *regular search queries for specific routes sent on a time
+> pattern (every hour at a certain time / every N minutes, etc.)* and ticket purchases using robotic requests.
+> The site also runs active anti-bot protection. Do not use this code to poll the site — doing so violates its rules.
+> The author takes no responsibility for any use of this code.
 
-Project context, decisions and roadmap: [initial_context.md](initial_context.md).
+Telegram bot + Mini App that watches sold-out trains on [pass.rw.by](https://pass.rw.by) and alerts you when seats appear.
 
 ## Status
 
 | Stage | State |
 |---|---|
-| 0. Polling test (`scripts/poll_test.py`) | 🔄 running |
+| 0. Polling test (`scripts/poll_test.py`) | ✅ anti-bot challenge triggered after ~10 min at ~2 req/min |
 | 1. Project skeleton | ✅ |
 | 2. pass.rw.by scraper | ✅ |
-| 3+ | planned |
+| 3+ (MongoDB, worker, bot, API, Mini App, Docker, Metabase) | planned |
 
 ## Development
 
@@ -24,7 +32,7 @@ uv run ruff check .     # lint
 uv run ruff format .    # format
 ```
 
-Try the scraper against the live site:
+Try the scraper against the live site (a single request, not polling):
 
 ```bash
 uv run python -m passrw_alerts.scraper Минск Гомель 2026-10-20
@@ -43,7 +51,7 @@ src/passrw_alerts/
 tests/
   fixtures/           # saved pass.rw.by responses
 scripts/
-  poll_test.py        # long-running ban/captcha test, stdlib only
+  poll_test.py        # long-running rate-limit / anti-bot test, stdlib only
 ```
 
 ## How pass.rw.by data is obtained
